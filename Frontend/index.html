@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Thermal + PIR + Distance + (2 Cameras)</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    /* new grid wrapper */
+    .camera-grid {
+      display: grid;
+      grid-template-areas:
+        ".     front   ."
+        "left  back    right";
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-gap: 10px;
+      margin-bottom: 20px;
+    }
+    .camera-container {
+      border: 1px solid #333;
+      padding: 5px;
+      text-align: center;
+    }
+    .front-view  { grid-area: front; }
+    .back-view   { grid-area: back; }
+    .left-view   { grid-area: left; }
+    .right-view  { grid-area: right; }
+    canvas {
+      display: block;
+      margin: 0 auto;
+    }
+    /* status & controls unchanged */
+    #status { margin-top: 10px; font-family: monospace; }
+    #controls { margin-top: 10px; }
+    button { padding: 8px 12px; font-size: 14px; margin-right: 5px; }
+    #human-display { font-family: monospace; font-size: 16px; margin-left: 10px; }
+  </style>
+</head>
+<body>
+    <div class="camera-grid">
+      <div class="camera-container front-view">
+        <h2>Front View</h2>
+        <canvas id="heatmap1"></canvas>
+      </div>
+      <div class="camera-container left-view">
+        <h2>Left View</h2>
+        <canvas id="heatmap4"></canvas>
+      </div>
+      <div class="camera-container right-view">
+        <h2>Right View</h2>
+        <canvas id="heatmap3"></canvas>
+      </div>
+      <div class="camera-container back-view">
+        <h2>Back View</h2>
+        <canvas id="heatmap2"></canvas>
+      </div>
+    </div>
+
+  <div id="status">
+    Motion:      <span id="motion">–</span> |
+    Presence:    <span id="presence">–</span> |
+    Ambient °C:  <span id="ambient">–</span> |
+    Mic:         <span id="mic">–</span> |
+    Gyro:        <span id="gyro">–</span> |
+    Accel:       <span id="accel">–</span> |
+    PIR:         <span id="pir">–</span> |
+    Distance1:   <span id="dist1">–</span> |
+    Distance2:   <span id="dist2">–</span>
+  </div>
+
+  <div id="controls">
+    <button id="toggle">Start Recording</button>
+    <button id="addHuman">+1 Human</button>
+    <button id="removeHuman">-1 Human</button>
+    <span id="human-display">Humans: <span id="humanCount">0</span></span>
+  </div>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // ---- constants & palette ----
+    const COLS = 32, ROWS = 24, SCALE = 10;
+    const MIN_T = 20, MAX_T = 35;
+
+    // Full 256‑entry RGB565 palette
+    const camColors = [
+      0x480F,0x400F,0x400F,0x400F,0x4010,0x3810,0x3810,0x3810,
+      0x3810,0x3010,0x3010,0x3010,0x2810,0x2810,0x2810,0x2810,
+      0x2010,0x2010,0x2010,0x1810,0x1810,0x1811,0x1011,0x1011,
+      0x0811,0x0811,0x0011,0x0011,0x0011,0x0011,0x0011,0x0011,
+      0x0011,0x0016,0x001F,0x013F,0x017F,0x01BF,0x01FF,0x025F,
+      0x02BF,0x031F,0x037F,0x03DF,0x043F,0x049F,0x04FF,0x057F,
+      0x05FF,0x067F,0x06FF,0x077F,0x07FF,0x0FFA,0x17F4,0x1FEE,
+      0x27E8,0x2FE2,0x37DC,0x3FD6,0x47D0,0x4FCA,0x57C4,0x5FBE,
+      0x67B8,0x6FB2,0x77AC,0x7FA6,0x87A0,0x8F9A,0x9794,0x9F8E,
+      0xA788,0xAF82,0xB77C,0xBF76,0xC770,0xCF6A,0xD764,0xDF5E,
+      0xE758,0xEF52,0xF74C,0xFF46,0xFF40,0xFF20,0xFF00,0xFEE0,
+      0xFEC0,0xFEA0,0xFE80,0xFE60,0xFE40,0xFE20,0xFE00,0xFDE0,
+      0xFDC0,0xFDA0,0xFD80,0xFD60,0xFD40,0xFD20,0xFD00,0xFCE0,
+      0xFCC0,0xFCA0,0xFC80,0xFC60,0xFC40,0xFC20,0xFC00,0xFBE0,
+      0xFBC0,0xFBA0,0xFB80,0xFB60,0xFB40,0xFB20,0xFB00,0xFAE0,
+      0xFAC0,0xFAA0,0xFA80,0xFA60,0xFA40,0xFA20,0xFA00,0xF9E0,
+      0xF9C0,0xF9A0,0xF980,0xF960,0xF940,0xF920,0xF900,0xF8E0,
+      0xF8C0,0xF8A0,0xF880,0xF860,0xF840,0xF820,0xF800,0xF800,
+      ...Array(256 - 128).fill(0xF800)
+    ];
+
+    // convert once to HEX strings
+    const hexPalette = camColors.map(rgb => {
+      let r = (rgb >> 11) & 0x1F,
+          g = (rgb >> 5)  & 0x3F,
+          b = rgb         & 0x1F;
+      r = (r << 3) | (r >> 2);
+      g = (g << 2) | (g >> 4);
+      b = (b << 3) | (b >> 2);
+      return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    });
+
+    // ---- DOM refs ----
+    const canv1 = document.getElementById('heatmap1');
+    const canv2 = document.getElementById('heatmap2');
+    const canv3 = document.getElementById('heatmap3');
+    const canv4 = document.getElementById('heatmap4');
+    [canv1, canv2, canv3, canv4].forEach(c => {
+      c.width = COLS * SCALE;
+      c.height = ROWS * SCALE;
+    });
+    const ctx1 = canv1.getContext('2d');
+    const ctx2 = canv2.getContext('2d');
+    const ctx3 = canv3.getContext('2d');
+    const ctx4 = canv4.getContext('2d');
+
+    let latestFrame3 = [];
+    let latestFrame4 = [];
+
+    const statusEls = {
+      motion:   document.getElementById('motion'),
+      presence: document.getElementById('presence'),
+      ambient:  document.getElementById('ambient'),
+      mic:      document.getElementById('mic'),
+      gyro:     document.getElementById('gyro'),
+      accel:    document.getElementById('accel'),
+      pir:      document.getElementById('pir'),
+      dist1:    document.getElementById('dist1'),
+      dist2:    document.getElementById('dist2')
+    };
+
+    const toggleBtn      = document.getElementById('toggle');
+    const incBtn         = document.getElementById('addHuman');
+    const decBtn         = document.getElementById('removeHuman');
+    const humanCountSpan = document.getElementById('humanCount');
+
+    // ---- state ----
+    let recording   = false;
+    let savedData   = [];
+    let humanCount  = 0;
+    let latestPir   = 0;
+    let latestDist1  = 0;
+    let latestDist2  = 0;
+
+    // ---- helpers ----
+    function clamp01(v) {
+      return Math.max(0, Math.min(1, v));
+    }
+
+    function drawHeatmap(ctx, temps) {
+      temps.forEach((t,i) => {
+        const idx = Math.floor(clamp01((t - MIN_T) / (MAX_T - MIN_T)) * 255);
+        const x = i % COLS, y = (i / COLS)|0;
+        ctx.fillStyle = hexPalette[idx];
+        ctx.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
+      });
+    }
+
+    function updateStatus(data) {
+      statusEls.motion.textContent   = data.motion.toFixed(1);
+      statusEls.presence.textContent = data.presence.toFixed(1);
+      statusEls.ambient.textContent  = data.ambient.toFixed(1);
+      statusEls.mic.textContent      = data.micValue.toFixed(0);
+      statusEls.gyro.textContent     = data.gyroMagnitude.toFixed(2);
+      statusEls.accel.textContent    = data.accelMagnitude.toFixed(2);
+      statusEls.pir.textContent      = latestPir;
+      statusEls.dist1.textContent    = latestDist1;
+      statusEls.dist2.textContent    = latestDist2;
+    }
+
+    function changeHumanCount(delta) {
+      humanCount = Math.max(0, humanCount + delta);
+      humanCountSpan.textContent = humanCount;
+    }
+
+    function exportCSV() {
+      if (!savedData.length) { alert('No data was recorded.'); return; }
+
+      const frameLen = savedData[0].thermal1.length;
+      const header = [
+        'timestamp','motion','presence','ambient'
+        ,'mic','gyroMagnitude','accelMagnitude',
+        'humans','pir','dist1','dist2',
+        ...Array.from({length:frameLen}, (_,i) => `thermal1_${i}`),
+        ...Array.from({length:frameLen}, (_,i) => `thermal2_${i}`),
+        ...Array.from({length:frameLen}, (_,i) => `thermal3_${i}`),
+        ...Array.from({length:frameLen}, (_,i) => `thermal4_${i}`)
+      ];
+
+      const rows = savedData.map(r => [
+        r.timestamp, r.motion, r.presence, r.ambient,
+         r.mic, r.gyroMagnitude,
+        r.accelMagnitude, r.humans, r.pir, r.dist1, r.dist2,
+        ...r.thermal1, ...r.thermal2, ...r.thermal3, ...r.thermal4
+      ].join(','));
+
+      const csv = [header.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `sensor_data_${new Date().toISOString()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function toggleRecording() {
+      recording = !recording;
+      toggleBtn.textContent = recording ? 'Stop & Save Recording' : 'Start Recording';
+      if (recording) {
+        savedData = [];
+      } else {
+        exportCSV();
+      }
+    }
+
+    // ---- event bindings ----
+    incBtn.addEventListener('click', () => changeHumanCount(1));
+    decBtn.addEventListener('click', () => changeHumanCount(-1));
+    toggleBtn.addEventListener('click', toggleRecording);
+
+    document.addEventListener('keydown', e => {
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          toggleRecording();
+          break;
+        case 'ArrowUp':
+          changeHumanCount(1);
+          break;
+        case 'ArrowDown':
+          changeHumanCount(-1);
+          break;
+      }
+    });
+
+    // ---- WebSocket feeds ----
+    //TODO: Add your IP
+    const wsThermal = new WebSocket('ws://IP:81');
+    wsThermal.onmessage = evt => {
+      const data = JSON.parse(evt.data);
+      const t1 = data.thermal1.split(',').map(parseFloat);
+      const t2 = data.thermal2.split(',').map(parseFloat);
+
+      drawHeatmap(ctx1, t1);
+      drawHeatmap(ctx2, t2);
+
+      updateStatus(data);
+
+      if (recording) {
+        savedData.push({
+          timestamp:      new Date().toISOString(),
+          motion:         data.motion,
+          presence:       data.presence,
+          ambient:        data.ambient,
+          mic:            data.micValue,
+          gyroMagnitude:  data.gyroMagnitude,
+          accelMagnitude: data.accelMagnitude,
+          humans:         humanCount,
+          pir:            latestPir,
+          dist1:          latestDist1,
+          dist2:          latestDist2,
+          thermal1:       t1,
+          thermal2:       t2,
+          thermal3:       latestFrame3,
+          thermal4:       latestFrame4
+        });
+      }
+    };
+
+    //TODO: Add your IP
+    const wsPir = new WebSocket('ws://IP:82');
+    wsPir.onmessage = evt => {
+      latestPir = parseInt(evt.data, 10);
+      statusEls.pir.textContent = latestPir;
+    };
+
+    // new distance sensor connections
+    //TODO: Add your IP
+    const wsDist1 = new WebSocket('ws://IP:83');
+    wsDist1.onmessage = evt => {
+      latestDist1 = parseFloat(evt.data);
+      statusEls.dist1.textContent = latestDist1;
+    };
+
+    //TODO: Add your IP
+    const wsDist2 = new WebSocket('ws://IP:84');
+    wsDist2.onmessage = evt => {
+      latestDist2 = parseFloat(evt.data);
+      statusEls.dist2.textContent = latestDist2;
+    };
+
+    //TODO: Add your IP
+    const wsCam3 = new WebSocket('ws://IP:85');
+    wsCam3.onmessage = evt => {
+    const t3 = evt.data.split(',').map(parseFloat);
+    latestFrame3 = t3;
+    drawHeatmap(ctx3, t3);
+    };
+
+    //TODO: Add your IP
+    const wsCam4 = new WebSocket('ws://IP:86');
+    wsCam4.onmessage = evt => {
+      const t4 = evt.data.split(',').map(parseFloat);
+      latestFrame4 = t4;
+      drawHeatmap(ctx4, t4);
+    };
+
+  });
+  </script>
+</body>
+</html>
