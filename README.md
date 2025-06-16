@@ -87,7 +87,7 @@ This notebook augments YOLO-format image data using Albumentations and saves the
 
 Augmented data: https://drive.google.com/drive/folders/1NytV8LiQXkOxDv8VbJKwQ03vC5M9PWSo?usp=sharing
 
-## 📁 split_data.ipynb
+## 📁 data_split.ipynb
 This notebook splits a YOLO-format dataset into training and validation sets.
 
 ✔️ Key Features:
