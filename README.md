@@ -102,3 +102,34 @@ This notebook splits a YOLO-format dataset into training and validation sets.
 * train/images/, train/labels/
 
 * val/images/, val/labels/
+
+## 📊 counting_model.ipynb
+This notebook evaluates trained YOLO-based people-counting models and visualizes their prediction performance against ground truth labels.
+
+✔️ Key Features:
+
+* ✅ Loads multiple YOLO models
+
+* ✅ Performs inference on validation datasets
+
+* ✅ Counts detected people (class 0) in each image
+
+* ✅ Compares predictions to ground truth
+
+* ✅ Visualizes results using scatter plots and error lines
+
+🧠 Models Evaluated:
+* YOLOv8n
+
+* YOLOv9s
+
+* YOLOv9m
+
+* YOLOv11
+
+📁 Expected Directory Structure:
+* val/images/, val/labels/ – standard validation data
+
+* real_val/images/, real_val/labels/ – real-world test set
+
+* Output CSVs and scatter plots are generated per model
