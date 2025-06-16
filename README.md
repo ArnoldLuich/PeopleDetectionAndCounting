@@ -61,11 +61,11 @@ URLS = {
 * **Wrong network details:** Re-flash with the correct SSID/PW.
 * **Still stuck?** Open the Serial Monitor to check for connection errors and verify the printed IP.
 
-## Data
+# Data
 Experiment 1 and 2: https://drive.google.com/drive/folders/1szdPLW-lkY_KEk2qsfVag0Lg9sDjrveZ?usp=drive_link
 
 Augmented data: https://drive.google.com/drive/folders/1NytV8LiQXkOxDv8VbJKwQ03vC5M9PWSo?usp=sharing
 
 Experiment 3: https://drive.google.com/drive/folders/1Kh5erYavckvwaRAUS1BimCH5lIHQIk9b?usp=sharing
 
-## Models
+# Models
