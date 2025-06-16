@@ -86,3 +86,19 @@ This notebook augments YOLO-format image data using Albumentations and saves the
 * aug/images/, aug/labels/ – output location
 
 Augmented data: https://drive.google.com/drive/folders/1NytV8LiQXkOxDv8VbJKwQ03vC5M9PWSo?usp=sharing
+
+## 📁 split_data.ipynb
+This notebook splits a YOLO-format dataset into training and validation sets.
+
+✔️ Key Features:
+
+* Ensures each image has a matching .txt YOLO label
+
+* Random 80/20 split into train/ and val/ folders
+
+* Copies files to appropriate subdirectories in Google Drive
+
+📁 Output folders:
+* train/images/, train/labels/
+
+* val/images/, val/labels/
