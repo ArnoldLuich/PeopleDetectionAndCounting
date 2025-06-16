@@ -69,3 +69,20 @@ Augmented data: https://drive.google.com/drive/folders/1NytV8LiQXkOxDv8VbJKwQ03v
 Experiment 3: https://drive.google.com/drive/folders/1Kh5erYavckvwaRAUS1BimCH5lIHQIk9b?usp=sharing
 
 # Models
+## 🧪 augmentation.ipynb
+
+This notebook augments YOLO-format image data using Albumentations and saves the output to Google Drive.
+
+✔️ Key features:
+* Applies augmentations: shift, rotate, flip, blur, noise, brightness/contrast
+
+* Saves augmented + original images and labels to aug/ folder
+
+📁 Expected folders:
+* data/images/ – original .jpg files
+
+* data/labels/ – YOLO .txt labels
+
+* aug/images/, aug/labels/ – output location
+
+Augmented data: https://drive.google.com/drive/folders/1NytV8LiQXkOxDv8VbJKwQ03vC5M9PWSo?usp=sharing
