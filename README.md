@@ -61,3 +61,5 @@ URLS = {
 * **Wrong network details:** Re-flash with the correct SSID/PW.
 * **Still stuck?** Open the Serial Monitor to check for connection errors and verify the printed IP.
 
+## Data
+https://drive.google.com/drive/folders/1GiWHWa2Ms_sRfP9jEW_fKJ9vvA0dUEzw?usp=sharing
